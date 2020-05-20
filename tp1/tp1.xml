@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+	<declaration>// Place global declarations here.
+
+chan take, release, goalong, leavecompanion;
+clock time;
+int [0,1] flashSide;            //which side the flashlight is
+int [0,4] carrierID;
+int [0,1] companion;
+</declaration>
+	<template>
+		<name x="5" y="5">Adventurer</name>
+		<parameter>const int delay, const int adventurerID</parameter>
+		<declaration>// Place local declarations here.
+clock y;</declaration>
+		<location id="id0" x="8" y="42">
+			<name x="-51" y="17">Begin</name>
+		</location>
+		<location id="id1" x="297" y="42">
+			<name x="287" y="8">CrossingBridgeOrWaitingCompanion</name>
+		</location>
+		<location id="id2" x="297" y="289">
+			<name x="314" y="297">End</name>
+		</location>
+		<location id="id3" x="8" y="289">
+			<name x="-144" y="272">CrossingBridgeBack</name>
+		</location>
+		<init ref="id0"/>
+		<transition>
+			<source ref="id1"/>
+			<target ref="id2"/>
+			<label kind="guard" x="348" y="59">y&gt;=delay and adventurerID!=carrierID</label>
+			<label kind="synchronisation" x="484" y="161">leavecompanion!</label>
+			<label kind="assignment" x="374" y="238">companion=0, flashSide=1</label>
+			<nail x="476" y="170"/>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id1"/>
+			<label kind="guard" x="-263" y="-42">flashSide==0 and carrierID!=0 and companion==0</label>
+			<label kind="synchronisation" x="127" y="-85">goalong!</label>
+			<label kind="assignment" x="238" y="-42">y=0, companion=1</label>
+			<nail x="153" y="-68"/>
+		</transition>
+		<transition>
+			<source ref="id3"/>
+			<target ref="id0"/>
+			<label kind="guard" x="-280" y="212">y&gt;=delay and carrierID==adventurerID</label>
+			<label kind="synchronisation" x="-68" y="144">release!</label>
+			<label kind="assignment" x="-127" y="85">carrierID=0, flashSide=0</label>
+		</transition>
+		<transition>
+			<source ref="id1"/>
+			<target ref="id2"/>
+			<label kind="guard" x="306" y="102">y&gt;=delay and adventurerID==carrierID</label>
+			<label kind="synchronisation" x="306" y="144">release!</label>
+			<label kind="assignment" x="306" y="195">carrierID=0, flashSide=1</label>
+		</transition>
+		<transition>
+			<source ref="id2"/>
+			<target ref="id3"/>
+			<label kind="guard" x="85" y="323">flashSide==1 and carrierID==0 and companion==0</label>
+			<label kind="synchronisation" x="127" y="272">take!</label>
+			<label kind="assignment" x="-25" y="306">y=0, carrierID=adventurerID</label>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id1"/>
+			<label kind="guard" x="17" y="51">flashSide==0 and carrierID==0</label>
+			<label kind="synchronisation" x="136" y="25">take!</label>
+			<label kind="assignment" x="93" y="76">y=0, carrierID=adventurerID</label>
+		</transition>
+	</template>
+	<template>
+		<name>Companion</name>
+		<location id="id4" x="-348" y="-127">
+			<name x="-424" y="-136">Available</name>
+		</location>
+		<location id="id5" x="-136" y="-127">
+			<name x="-119" y="-136">Busy</name>
+		</location>
+		<init ref="id4"/>
+		<transition>
+			<source ref="id5"/>
+			<target ref="id4"/>
+			<label kind="synchronisation" x="-297" y="-59">leavecompanion?</label>
+			<nail x="-246" y="-59"/>
+		</transition>
+		<transition>
+			<source ref="id4"/>
+			<target ref="id5"/>
+			<label kind="synchronisation" x="-280" y="-212">goalong?</label>
+			<nail x="-246" y="-195"/>
+		</transition>
+	</template>
+	<template>
+		<name>Flashlight</name>
+		<location id="id6" x="-697" y="-178">
+			<name x="-756" y="-187">Free</name>
+		</location>
+		<location id="id7" x="-459" y="-178">
+			<name x="-433" y="-187">Taken</name>
+		</location>
+		<init ref="id6"/>
+		<transition>
+			<source ref="id7"/>
+			<target ref="id6"/>
+			<label kind="synchronisation" x="-603" y="-110">release ?</label>
+			<nail x="-578" y="-110"/>
+		</transition>
+		<transition>
+			<source ref="id6"/>
+			<target ref="id7"/>
+			<label kind="synchronisation" x="-595" y="-255">take ?</label>
+			<nail x="-578" y="-238"/>
+		</transition>
+	</template>
+	<system>const int fastest = 1;
+const int fast = 2;
+const int slow = 5;
+const int slowest = 10;
+
+Adventurer1 = Adventurer(fastest,1);
+Adventurer2 = Adventurer(fast,2);
+Adventurer3 = Adventurer(slow,3);
+Adventurer4 = Adventurer(slowest,4);
+
+system Adventurer1, Adventurer2, Adventurer3, Adventurer4, Companion, Flashlight;</system>
+	<queries>
+		<query>
+			<formula>A[] not deadlock</formula>
+			<comment></comment>
+		</query>
+		<query>
+			<formula>E&lt;&gt; Adventurer1.End and Adventurer2.End and Adventurer3.End and Adventurer4.End and time&lt;17</formula>
+			<comment></comment>
+		</query>
+		<query>
+			<formula>E&lt;&gt; Adventurer1.End and Adventurer2.End and Adventurer3.End and Adventurer4.End and time == 17</formula>
+			<comment></comment>
+		</query>
+	</queries>
+</nta>
