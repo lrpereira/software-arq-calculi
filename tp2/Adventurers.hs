@@ -9,12 +9,13 @@ data Adventurer = P1 | P2 | P5 | P10 deriving (Show,Eq)
 type Objects = Either Adventurer ()
 
 -- The time that each adventurer needs to cross the bridge
--- To implement DONE?
+-- To implement 
 getTimeAdv :: Adventurer -> Int
 getTimeAdv P1 = 1
 getTimeAdv P2 = 2
 getTimeAdv P5 = 5
 getTimeAdv P10 = 10
+
 
 {-- The state of the game, i.e. the current position of each adventurer
 + the lantern. The function (const False) represents the initial state
@@ -50,14 +51,14 @@ changeState a s = let v = s a in (\x -> if x == a then not v else s x)
 
 -- Changes the state of the game of a list of objects 
 mChangeState :: [Objects] -> State -> State
-mChangeState os s = foldr changeState s os            
+mChangeState os s = foldr changeState s os
+                               
 
 {-- For a given state of the game, the function presents all the
 possible moves that the adventurers can make.  --}
 -- To implement
 allValidPlays :: State -> ListDur State
-allValidPlays = manyChoice [
-                return ()]
+allValidPlays = undefined
 
 {-- For a given number n and initial state, the function calculates
 all possible n-sequences of moves that the adventures can make --}
@@ -87,25 +88,23 @@ data ListDur a = LD [Duration a] deriving Show
 remLD :: ListDur a -> [Duration a]
 remLD (LD x) = x
 
--- To implement DONE?
+-- To implement
 instance Functor ListDur where
-  fmap f = let f' = \(s,x) -> (s, f x) in
-     LD . (map f') . remLD
+  fmap f = let f' = \(Duration (i,x)) -> (Duration (i, f x)) in
+    LD . (map f') . remLD
 
--- To implement DONE?
+-- To implement
 instance Applicative ListDur where
-  pure x = LD [([],x)] -- MAY BE WRONG
+  pure x = LD [(Duration (0,x))]
   l1 <*> l2 = LD $ do x <- remLD l1
-                       y <- remLD l2
-                       g(x,y) where
-                         g((s,f),(s',x)) = return (s ++ s', f x)
+                      y <- remLD l2
+                      g(x,y) where
+                        g((s,f),(s',x)) = return (s ++ s', f x)
 
--- To implement DONE?
+-- To implement
 instance Monad ListDur where
-  return = pure
-  l >>= k = LD $ do x <- remLD l
-                     g x where
-                       g(s,x) = let u = (remLD (k x)) in map (\(s',x) -> (s ++ s', x)) u
+   return = undefined
+   l >>= k = undefined
 
 manyChoice :: [ListDur a] -> ListDur a
 manyChoice = LD . concat . (map remLD)
