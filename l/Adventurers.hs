@@ -94,7 +94,7 @@ instance Functor ListDur where
     fmap f = LD . (map f') . remLD
         where f' = \(Duration (i,x)) -> (Duration (i, f x))
 
--- To implement
+-- To implement DONE
 instance Applicative ListDur where
    pure x = LD [(Duration (0,x))]
    (<*>) l1 l2 = LD $ mzipWith f (remLD l1) (remLD l2) where
@@ -109,7 +109,19 @@ instance Applicative ListDur where
 -- To implement
 instance Monad ListDur where
    return = pure
-   l >>= k = undefined
+   l >>= k = LD $ do x <- remLD l
+                     g x where
+                       g(s,x) = let u = (remLD (k x)) in map f u where
+                                        f = (\(Duration (s,x)) -> Duration (s+(getDuration u),getValue u))
+            
+   -- l >>= k = LD $ map f (remLD l) where
+   --                     let u = (remLD (k x)) in
+   --                     f = \(Duration (s,x)) -> Duration (s+getDuration(remLD(k x)), getValue(remLD(k x)))
+
+             -- do x <- remLD l
+             --         g x where
+             --           g(s,x) = let u = (remLD (k x)) in map (\(s',x) -> (s ++ s', x)) u
+
 
 manyChoice :: [ListDur a] -> ListDur a
 manyChoice = LD . concat . (map remLD)
