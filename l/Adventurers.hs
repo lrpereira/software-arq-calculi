@@ -2,6 +2,7 @@
 module Adventurers where
 
 import Control.Monad.Zip
+import Data.List
 import DurationMonad
     
 -- The list of adventurers
@@ -58,14 +59,41 @@ mChangeState os s = foldr changeState s os
 {-- For a given state of the game, the function presents all the
 possible moves that the adventurers can make.  --}
 -- To implement
+--allValidPlays :: State -> ListDur State
+--allValidPlays x = manyChoice[
+--  return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P1, Right ()] x)),
+ -- return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P2, Right ()] x)),
+  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P5, Right ()] x)),
+  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P10, Right ()] x)),
+  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P1, Left P2, Right ()] x)),
+  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P1, Left P5, Right ()] x)),
+  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P1, Left P10, Right ()] x)),
+  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P2, Left P5, Right ()] x)),
+  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P2, Left P10, Right ()] x)),
+  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P5, Left P10, Right ()] x))]
+
 allValidPlays :: State -> ListDur State
-allValidPlays = undefined
+allValidPlays x = manyChoice[
+  return $ mChangeState [Left P1, Right ()] x,
+  return $ mChangeState [Left P2, Right ()] x,
+  return $ mChangeState [Left P5, Right ()] x,
+  return $ mChangeState [Left P10, Right ()] x,
+  return $ mChangeState [Left P1, Left P2, Right ()] x,
+  return $ mChangeState [Left P1, Left P5, Right ()] x,
+  return $ mChangeState [Left P1, Left P10, Right ()] x,
+  return $ mChangeState [Left P2, Left P5, Right ()] x,
+  return $ mChangeState [Left P2, Left P10, Right ()] x,
+  return $ mChangeState [Left P5, Left P10, Right ()] x]
+
 
 {-- For a given number n and initial state, the function calculates
 all possible n-sequences of moves that the adventures can make --}
 -- To implement
 exec :: Int -> State -> ListDur State
-exec = undefined
+exec n s = do s1 <- allValidPlays (s)
+              s2 <- allValidPlays (s1)
+              s3 <- allValidPlays (s2)
+              return s3
 
 {-- Is it possible for all adventurers to be on the other side
 in <=17 min and not exceeding 5 moves ? --}
@@ -78,7 +106,15 @@ in < 17 min ? --}
 -- To implement
 l17 :: Bool
 l17 = undefined
+ 
 
+-- Our definitions
+gFinal :: State
+gFinal = const True
+
+-- Determines whether the target position was achieved or not
+ltargetAchieved :: State -> ListDur State -> Maybe (Duration State)
+ltargetAchieved t l = let l' = remLD l in find (\(Duration (s,x)) -> x == t) l'
 
 --------------------------------------------------------------------------
 {-- Implementation of the monad used for the problem of the adventurers.
@@ -94,7 +130,7 @@ instance Functor ListDur where
     fmap f = LD . (map f') . remLD
         where f' = \(Duration (i,x)) -> (Duration (i, f x))
 
--- To implement DONE
+-- To implement
 instance Applicative ListDur where
    pure x = LD [(Duration (0,x))]
    (<*>) l1 l2 = LD $ mzipWith f (remLD l1) (remLD l2) where
@@ -108,19 +144,10 @@ instance Applicative ListDur where
 
 -- To implement
 instance Monad ListDur where
-   return = pure
-   l >>= k = LD $ do x <- remLD l
-                     g x where
-                       g(s,x) = let u = (remLD (k x)) in map f u where
-                                        f = (\(Duration (s,x)) -> Duration (s+(getDuration u),getValue u))
-            
-   -- l >>= k = LD $ map f (remLD l) where
-   --                     let u = (remLD (k x)) in
-   --                     f = \(Duration (s,x)) -> Duration (s+getDuration(remLD(k x)), getValue(remLD(k x)))
-
-             -- do x <- remLD l
-             --         g x where
-             --           g(s,x) = let u = (remLD (k x)) in map (\(s',x) -> (s ++ s', x)) u
+  return = pure
+  l >>= k = LD $ do x <- remLD l
+                    g x where
+                      g(Duration (s,x)) = let u = (remLD (k x)) in map (\(Duration (s',x)) -> (Duration (s + s', x))) u
 
 
 manyChoice :: [ListDur a] -> ListDur a
