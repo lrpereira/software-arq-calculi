@@ -4,7 +4,7 @@ module Adventurers where
 import Control.Monad.Zip
 import Data.List.Extra
 import DurationMonad
-    
+
 -- The list of adventurers
 data Adventurer = P1 | P2 | P5 | P10 deriving (Show,Eq)
 
@@ -54,7 +54,7 @@ changeState a s = let v = s a
 mChangeState :: [Objects] -> State -> State
 mChangeState os s = if allSame (fmap s os)
                     then foldr changeState s os
-                    else s 
+                    else s
 
 {-- For a given state of the game, the function presents all the
 possible moves that the adventurers can make.  --}
@@ -99,12 +99,12 @@ data ListDur a = LD [Duration a] deriving Show
 
 remLD :: ListDur a -> [Duration a]
 remLD (LD x) = x
-               
+
 instance Functor ListDur where
   fmap f = LD . (map f') . remLD
     where
       f' = \(Duration (i, x)) -> (Duration (i, f x))
-           
+
 instance Applicative ListDur where
   pure x = LD [Duration (0, x)]
   l1 <*> l2 = LD $ mzipWith f (remLD l1) (remLD l2)
@@ -149,7 +149,7 @@ remLog (Log x) = x
 instance Functor LogList where
   fmap f = let f' = \(s,x) -> (s, f x) in
     Log . (map f') . remLog
-        
+
 instance Applicative LogList where
   pure x = Log [([], x)]
   l1 <*> l2 = Log $ do
@@ -174,6 +174,10 @@ mwrite msg l = Log $ let l' = remLog l in map (\(s,x) -> (s ++ msg, x)) l'
 lgInit :: ListDur State
 lgInit = return $ gInit
 
+-- The final state of the game
+lgFinal :: ListDur State
+lgFinal = return $ gFinal
+
 lallValidPlays :: ListDur State -> LogList (ListDur State)
 lallValidPlays (LD [Duration (x,s)]) =
     manyLChoice[ mwrite (" "++(show s)++" ") (return $ waitP P1  $ return $ mChangeState [Left P1, Right ()] s),
@@ -194,3 +198,35 @@ lallValidPlays (LD [Duration (x,s)]) =
 lexec :: Int -> ListDur State -> LogList (ListDur State)
 lexec 0 s = return s
 lexec n s = do { s1 <- (lallValidPlays s) ; lexec (n - 1) s1 }
+
+
+lleq17 = case find (\(log,LD [Duration (b,c)]) -> b==17 && c==gFinal) (remLog (lexec 6 lgInit)) of
+           Nothing -> (show "")
+           Just y  -> (show y)
+
+{----------------------------------- Monad LogList -----------------------------------}
+
+-- data LogListDur a = L [(String, a)] deriving Show
+
+-- remL :: LogListDur a -> [(String, a)]
+-- remL (L x) = x
+
+-- instance Functor LogListDur where
+--   fmap f = Log . map f' . remL
+--     where
+--       f' = \(log, x) -> (log, f x)
+
+-- instance Applicative LogListDur where
+--   pure x = Log [([], x)]
+--   l1 <*> l2 = Log $ do
+--     x <- remLog l1
+--     y <- remLog l2
+--     g (x, y)
+--     where
+--       g ((s, f), (s', x)) = return (s ++ s', f x)
+
+-- instance Monad LogListDur where
+--   return = pure
+--   l >>= k = Log $ do x <- remLog l
+--                      g x where
+--                        g(s,x) = let u = (remLog (k x)) in map (\(s',x) -> (s ++ s', x)) u
