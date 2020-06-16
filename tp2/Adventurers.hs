@@ -206,24 +206,27 @@ lleq17 = case find (\(log,LD [Duration (b,c)]) -> b==17 && c==gFinal) (remLog (l
 
 {----------------------------------- Monad LogList -----------------------------------}
 
--- data LogListDur a = L [(String, a)] deriving Show
+-- data LogListDur a = L [(String, Duration a)] deriving Show
 
--- remL :: LogListDur a -> [(String, a)]
+-- remL :: LogListDur a -> [(String, Duration a)]
 -- remL (L x) = x
 
 -- instance Functor LogListDur where
---   fmap f = Log . map f' . remL
---     where
---       f' = \(log, x) -> (log, f x)
+--   fmap f x = do
+--       res <- x
+--       return (f res)
 
 -- instance Applicative LogListDur where
---   pure x = Log [([], x)]
---   l1 <*> l2 = Log $ do
---     x <- remLog l1
---     y <- remLog l2
---     g (x, y)
---     where
---       g ((s, f), (s', x)) = return (s ++ s', f x)
+--   pure x = L [([], Duration (0,x))]
+--   (L f) <*> x = fmap f x
+
+
+--     --   L $ do
+--     -- f' <- remL f
+--     -- x' <- remL x
+--     -- g (f',x')
+--     -- where
+--     --   g ((s, f), (s', x)) = return (s ++ s', f x)
 
 -- instance Monad LogListDur where
 --   return = pure
