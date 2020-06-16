@@ -2,7 +2,6 @@
 module Adventurers where
 
 import Control.Monad.Zip
-import Data.List
 import Data.List.Extra
 import DurationMonad
     
@@ -61,33 +60,25 @@ possible moves that the adventurers can make.  --}
 -- To implement
 allValidPlays :: State -> ListDur State
 allValidPlays x = manyChoice[
-  waitP1 $ return $ mChangeState [Left P1, Right ()] x,
-  waitP2 $ return $ mChangeState [Left P2, Right ()] x,
-  waitP5 $ return $ mChangeState [Left P5, Right ()] x,
-  waitP10 $ return $ mChangeState [Left P10, Right ()] x,
-  waitP2 $ return $ mChangeState [Left P1, Left P2, Right ()] x,
-  waitP5 $ return $ mChangeState [Left P1, Left P5, Right ()] x,
-  waitP10 $ return $ mChangeState [Left P1, Left P10, Right ()] x,
-  waitP5 $ return $ mChangeState [Left P2, Left P5, Right ()] x,
-  waitP10 $ return $ mChangeState [Left P2, Left P10, Right ()] x,
-  waitP10 $ return $ mChangeState [Left P5, Left P10, Right ()] x]
+  waitP P1 $ return $ mChangeState [Left P1, Right ()] x,
+  waitP P2 $ return $ mChangeState [Left P2, Right ()] x,
+  waitP P5 $ return $ mChangeState [Left P5, Right ()] x,
+  waitP P10 $ return $ mChangeState [Left P10, Right ()] x,
+  waitP P2 $ return $ mChangeState [Left P1, Left P2, Right ()] x,
+  waitP P5 $ return $ mChangeState [Left P1, Left P5, Right ()] x,
+  waitP P10 $ return $ mChangeState [Left P1, Left P10, Right ()] x,
+  waitP P5 $ return $ mChangeState [Left P2, Left P5, Right ()] x,
+  waitP P10 $ return $ mChangeState [Left P2, Left P10, Right ()] x,
+  waitP P10 $ return $ mChangeState [Left P5, Left P10, Right ()] x]
 
 
 {-- For a given number n and initial state, the function calculates
 all possible n-sequences of moves that the adventures can make --}
 -- To implement
 exec :: Int -> State -> ListDur State
-exec n s = do s1 <- allValidPlays (s)
-              s2 <- allValidPlays (s1)
-              s3 <- allValidPlays (s2)
-              s4 <- allValidPlays (s3)
-              s5 <- allValidPlays (s4)
-              return s5
-
---exec 1 s = do s1 <- allValidPlays (s)
---              return s1
---exec n s = do s1 <- allValidPlays (s)
---             return (exec n-1 (remLD s1))
+exec 0 s = return s
+exec n s = do s1 <- allValidPlays s
+              exec (n-1) s1
 
 {-- Is it possible for all adventurers to be on the other side
 in <=17 min and not exceeding 5 moves ? --}
@@ -102,41 +93,9 @@ leq17 = case find (\(Duration (s,x)) -> s <= 17 && x == gFinal) (remLD (exec 5 g
 in < 17 min ? --}
 -- To implement
 l17 :: Bool
-l17 = case find (\(Duration (s,x)) -> s < 17 && x == gFinal) (remLD (exec 100 gInit)) of
+l17 = case find (\(Duration (s,x)) -> s < 17 && x == gFinal) (remLD (exec 6 gInit)) of
         Nothing -> False
         Just _ -> True
- 
-
--- Our definitions
-
--- 
-allSame :: Eq a => [a] -> Bool
-allSame [] = True
-allSame (x:xs) = all (x ==) xs
-
--- Wait time for P1
-waitP1 :: ListDur State -> ListDur State
-waitP1 (LD [(Duration (d,x))]) = LD [Duration (d+(getTimeAdv P1),x)]
-
--- Wait time for P2
-waitP2 :: ListDur State -> ListDur State
-waitP2 (LD [(Duration (d,x))]) = LD [Duration (d+(getTimeAdv P2),x)]
-
--- Wait time for P5
-waitP5 :: ListDur State -> ListDur State
-waitP5 (LD [(Duration (d,x))]) = LD [Duration (d+(getTimeAdv P5),x)]
-
--- Wait time for P10
-waitP10 :: ListDur State -> ListDur State
-waitP10 (LD [(Duration (d,x))]) = LD [Duration (d+(getTimeAdv P10),x)]
-
--- The final state of the game
-gFinal :: State
-gFinal = const True
-
--- Determines whether the adventurers arrived at the other side of the bridge or not
-ltargetAchieved :: State -> ListDur State -> Maybe (Duration State)
-ltargetAchieved t l = let l' = remLD l in find (\(Duration (s,x)) -> x == t) l'
 
 --------------------------------------------------------------------------
 {-- Implementation of the monad used for the problem of the adventurers.
@@ -175,3 +134,86 @@ instance Monad ListDur where
 manyChoice :: [ListDur a] -> ListDur a
 manyChoice = LD . concat . (map remLD)
 --------------------------------------------------------------------------
+
+-- Our definitions
+
+-- Wait time for P
+waitP :: Adventurer -> ListDur State -> ListDur State
+waitP p (LD [(Duration (d,x))]) = LD [Duration (d+(getTimeAdv p),x)]
+
+-- The final state of the game
+gFinal :: State
+gFinal = const True
+
+-- Determines whether the adventurers arrived at the other side of the bridge or not
+allSafe :: State -> ListDur State -> Maybe (Duration State)
+allSafe t l = let l' = remLD l in find (\(Duration (s,x)) -> x == t) l'
+
+
+
+
+
+
+
+
+
+
+
+
+{--data LogList a = Log [(String, Duration a)] deriving Show
+
+remLog :: LogList a -> [(String, Duration a)]
+remLog (Log x) = x
+
+instance Functor LogList where
+  fmap f = let f' = \(s, Duration x) -> (s, Duration (f x)) in
+    Log . (map f') . remLog
+
+instance Applicative LogList where
+  pure x = Log [([],x)]
+  l1 <*> l2 = Log $ do x <- remLog l1
+                       y <- remLog l2
+                       g(x,y) where
+                         g((s,f),(s',x)) = return (s ++ s', f x)
+
+instance Monad LogList where
+  return = pure
+  l >>= k = Log $ do x <- remLog l
+                     g x where
+                       g(s,x) = let u = (remLog (k x)) in map (\(s',x) -> (s ++ s', x)) u
+
+manyLChoice :: [LogList a] -> LogList a
+manyLChoice = Log . manyChoice . (map remLog)
+
+mwrite :: String -> LogList a -> LogList a
+mwrite msg l = Log $ let l' = remLog l in map (\(s,x) -> (s ++ msg, x)) l'
+
+lpossibleMoves :: State -> LogList State
+lpossibleMoves x = manyLChoice[
+  mwrite (" "++"P1"++" ") (waitP P1 $ return $ mChangeState [Left P1, Right ()] x),
+  mwrite (" "++"P2"++" ") (waitP P2 $ return $ mChangeState [Left P2, Right ()] x),
+  mwrite (" "++"P5"++" ") (waitP P5 $ return $ mChangeState [Left P5, Right ()] x),
+  mwrite (" "++"P10"++" ") (waitP P10 $ return $ mChangeState [Left P10, Right ()] x),
+  mwrite (" "++"P1 e P2"++" ") (waitP P2 $ return $ mChangeState [Left P1, Left P2, Right ()] x),
+  mwrite (" "++"P1 e P5"++" ") (waitP P5 $ return $ mChangeState [Left P1, Left P5, Right ()] x),
+  mwrite (" "++"P1 e P10"++" ") (waitP P10 $ return $ mChangeState [Left P1, Left P10, Right ()] x),
+  mwrite (" "++"P2 e P5"++" ") (waitP P5 $ return $ mChangeState [Left P2, Left P5, Right ()] x),
+  mwrite (" "++"P2 e P10"++" ") (waitP P10 $ return $ mChangeState [Left P2, Left P10, Right ()] x),
+  mwrite (" "++"P5 e P10"++" ") (waitP P10 $ return $ mChangeState [Left P5, Left P10, Right ()] x)]
+  
+
+lexec n s = do s0 <- lpossibleMoves s
+               s1 <- lpossibleMoves s0
+               s2 <- lpossibleMoves s1
+               s3 <- lpossibleMoves s2
+               s4 <- lpossibleMoves s3
+               s5 <- lpossibleMoves s4
+               return s5
+
+--lexec 0 s = return s
+--lexec n s = do s1 <- lpossibleMoves s
+--              lexec (n-1) s1
+           
+-- Determines whether the target position was achieved or not
+ltargetAchieved :: State -> LogList State -> Maybe (String,State)
+ltargetAchieved t l = let l' = remLog l in find (\(s,x) -> x == t) l'--}
