@@ -3,6 +3,7 @@ module Adventurers where
 
 import Control.Monad.Zip
 import Data.List
+import Data.List.Extra
 import DurationMonad
     
 -- The list of adventurers
@@ -53,37 +54,23 @@ changeState a s = let v = s a in (\x -> if x == a then not v else s x)
 
 -- Changes the state of the game of a list of objects
 mChangeState :: [Objects] -> State -> State
-mChangeState os s = foldr changeState s os
-
+mChangeState os s = if allSame (fmap s os) then foldr changeState s os else s 
 
 {-- For a given state of the game, the function presents all the
 possible moves that the adventurers can make.  --}
 -- To implement
---allValidPlays :: State -> ListDur State
---allValidPlays x = manyChoice[
---  return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P1, Right ()] x)),
- -- return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P2, Right ()] x)),
-  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P5, Right ()] x)),
-  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P10, Right ()] x)),
-  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P1, Left P2, Right ()] x)),
-  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P1, Left P5, Right ()] x)),
-  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P1, Left P10, Right ()] x)),
-  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P2, Left P5, Right ()] x)),
-  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P2, Left P10, Right ()] x)),
-  --return ( (<*>) (LD [Duration (getTimeAdv P1, (+))]) (mChangeState [Left P5, Left P10, Right ()] x))]
-
 allValidPlays :: State -> ListDur State
 allValidPlays x = manyChoice[
-  return $ mChangeState [Left P1, Right ()] x,
-  return $ mChangeState [Left P2, Right ()] x,
-  return $ mChangeState [Left P5, Right ()] x,
-  return $ mChangeState [Left P10, Right ()] x,
-  return $ mChangeState [Left P1, Left P2, Right ()] x,
-  return $ mChangeState [Left P1, Left P5, Right ()] x,
-  return $ mChangeState [Left P1, Left P10, Right ()] x,
-  return $ mChangeState [Left P2, Left P5, Right ()] x,
-  return $ mChangeState [Left P2, Left P10, Right ()] x,
-  return $ mChangeState [Left P5, Left P10, Right ()] x]
+  waitP1 $ return $ mChangeState [Left P1, Right ()] x,
+  waitP2 $ return $ mChangeState [Left P2, Right ()] x,
+  waitP5 $ return $ mChangeState [Left P5, Right ()] x,
+  waitP10 $ return $ mChangeState [Left P10, Right ()] x,
+  waitP2 $ return $ mChangeState [Left P1, Left P2, Right ()] x,
+  waitP5 $ return $ mChangeState [Left P1, Left P5, Right ()] x,
+  waitP10 $ return $ mChangeState [Left P1, Left P10, Right ()] x,
+  waitP5 $ return $ mChangeState [Left P2, Left P5, Right ()] x,
+  waitP10 $ return $ mChangeState [Left P2, Left P10, Right ()] x,
+  waitP10 $ return $ mChangeState [Left P5, Left P10, Right ()] x]
 
 
 {-- For a given number n and initial state, the function calculates
@@ -93,26 +80,61 @@ exec :: Int -> State -> ListDur State
 exec n s = do s1 <- allValidPlays (s)
               s2 <- allValidPlays (s1)
               s3 <- allValidPlays (s2)
-              return s3
+              s4 <- allValidPlays (s3)
+              s5 <- allValidPlays (s4)
+              return s5
+
+--exec 1 s = do s1 <- allValidPlays (s)
+--              return s1
+--exec n s = do s1 <- allValidPlays (s)
+--             return (exec n-1 (remLD s1))
 
 {-- Is it possible for all adventurers to be on the other side
 in <=17 min and not exceeding 5 moves ? --}
 -- To implement
 leq17 :: Bool
-leq17 = undefined
+leq17 = case find (\(Duration (s,x)) -> s <= 17 && x == gFinal) (remLD (exec 5 gInit)) of
+        Nothing -> False
+        Just _ -> True
+
 
 {-- Is it possible for all adventurers to be on the other side
 in < 17 min ? --}
 -- To implement
 l17 :: Bool
-l17 = undefined
+l17 = case find (\(Duration (s,x)) -> s < 17 && x == gFinal) (remLD (exec 100 gInit)) of
+        Nothing -> False
+        Just _ -> True
  
 
 -- Our definitions
+
+-- 
+allSame :: Eq a => [a] -> Bool
+allSame [] = True
+allSame (x:xs) = all (x ==) xs
+
+-- Wait time for P1
+waitP1 :: ListDur State -> ListDur State
+waitP1 (LD [(Duration (d,x))]) = LD [Duration (d+(getTimeAdv P1),x)]
+
+-- Wait time for P2
+waitP2 :: ListDur State -> ListDur State
+waitP2 (LD [(Duration (d,x))]) = LD [Duration (d+(getTimeAdv P2),x)]
+
+-- Wait time for P5
+waitP5 :: ListDur State -> ListDur State
+waitP5 (LD [(Duration (d,x))]) = LD [Duration (d+(getTimeAdv P5),x)]
+
+-- Wait time for P10
+waitP10 :: ListDur State -> ListDur State
+waitP10 (LD [(Duration (d,x))]) = LD [Duration (d+(getTimeAdv P10),x)]
+
+-- The final state of the game
 gFinal :: State
 gFinal = const True
 
--- Determines whether the target position was achieved or not
+-- Determines whether the adventurers arrived at the other side of the bridge or not
 ltargetAchieved :: State -> ListDur State -> Maybe (Duration State)
 ltargetAchieved t l = let l' = remLD l in find (\(Duration (s,x)) -> x == t) l'
 
