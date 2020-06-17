@@ -3,6 +3,7 @@ module Adventurers where
 
 import Control.Monad.Zip
 import Data.List.Extra
+import Extra
 import DurationMonad
 
 -- The list of adventurers
@@ -44,6 +45,10 @@ instance Eq State where
 -- The initial state of the game
 gInit :: State
 gInit = const False
+
+-- The final state of the game
+gFinal :: State
+gFinal = const True
 
 -- Changes the state of the game for a given object
 changeState :: Objects -> State -> State
@@ -101,9 +106,9 @@ remLD :: ListDur a -> [Duration a]
 remLD (LD x) = x
 
 instance Functor ListDur where
-  fmap f = LD . (map f') . remLD
-    where
-      f' = \(Duration (i, x)) -> (Duration (i, f x))
+    fmap f = LD . (map f') . remLD
+        where
+          f' = \(Duration (i, x)) -> (Duration (i, f x))
 
 instance Applicative ListDur where
   pure x = LD [Duration (0, x)]
@@ -129,107 +134,66 @@ instance Monad ListDur where
 manyChoice :: [ListDur a] -> ListDur a
 manyChoice = LD . concat . (map remLD)
 
-{----------------------------------- Our Definitions -----------------------------------}
-
 -- Wait time for P
 waitP :: Adventurer -> ListDur State -> ListDur State
 waitP p (LD [d]) = LD [(wait (getTimeAdv p) d)]
 
--- The final state of the game
-gFinal :: State
-gFinal = const True
+{----------------------------------- Monad LogListDur -----------------------------------}
 
-{----------------------------------- Monad LogList -----------------------------------}
+data LogListDur a = L [(String, Duration a)] deriving Show
 
-data LogList a = Log [(String, a)] deriving Show
+remL :: LogListDur a -> [(String, Duration a)]
+remL (L s) = s
 
-remLog :: LogList a -> [(String, a)]
-remLog (Log x) = x
+instance Functor LogListDur where
+    fmap f (L l) = L $ map (id >< Duration . (id >< f) . remD ) l
 
-instance Functor LogList where
-  fmap f = let f' = \(s,x) -> (s, f x) in
-    Log . (map f') . remLog
+instance Applicative LogListDur where
+    pure s = (L . singl) ([], Duration (0, s))
+    (<*>) l1 l2 = L $ do
+                    fs <- remL l1
+                    xs <- remL l2
+                    gs(fs,xs) where
+                        gs((str1, Duration (d1,g)) , (str2, Duration (d2,x))) = return ((str1 ++ str2) , Duration (d1 + d2 , g x))
 
-instance Applicative LogList where
-  pure x = Log [([], x)]
-  l1 <*> l2 = Log $ do
-    x <- remLog l1
-    y <- remLog l2
-    g (x, y)
-    where
-      g ((s, f), (s', x)) = return (s ++ s', f x)
+-- Is this alternative right ?
+-- (<*>) (L f) (L x) = L $ mzipWith g f x where
+--                             g (str1 , (Duration (d1,f))) (str2 , Duration (d2,x)) = (str1 ++ str2 , Duration (d1+d2, f x))
 
-instance Monad LogList where
-  return = pure
-  l >>= k = Log $ do x <- remLog l
-                     g x where
-                       g(s,x) = let u = (remLog (k x)) in map (\(s',x) -> (s ++ s', x)) u
+instance Monad LogListDur where
+    return  = pure
+    l >>= k = L $ do
+                xs <- remL l
+                g xs where
+                    g (str , Duration (d,x)) = map (\(str', Duration (d',x)) -> (str ++ str' , (Duration (d + d' , x)))) u where
+                          u = remL (k x)
 
-manyLChoice :: [LogList a] -> LogList a
-manyLChoice = Log . concat . (map remLog)
+manyLChoice :: [LogListDur a] -> LogListDur a
+manyLChoice = L . concat . (map remL)
 
-mwrite :: String -> LogList a -> LogList a
-mwrite msg l = Log $ let l' = remLog l in map (\(s,x) -> (s ++ msg, x)) l'
+mwrite :: String -> LogListDur a -> LogListDur a
+mwrite msg l = L $ let l' = remL l in map (\(s,x) -> (s ++ msg, x)) l'
 
-lgInit :: ListDur State
-lgInit = return $ gInit
+lwaitP :: Adventurer -> LogListDur State -> LogListDur State
+lwaitP p (L [(str , d)]) = L [(str, wait (getTimeAdv p) d)]
 
--- The final state of the game
-lgFinal :: ListDur State
-lgFinal = return $ gFinal
+lvalidPlays :: State -> LogListDur State
+lvalidPlays s =
+    manyLChoice[ mwrite (" "++(show s)++" ") (lwaitP P1  $ return $ mChangeState [Left P1, Right ()] s),
+                 mwrite (" "++(show s)++" ") (lwaitP P2  $ return $ mChangeState [Left P2, Right ()] s),
+                 mwrite (" "++(show s)++" ") (lwaitP P5  $ return $ mChangeState [Left P5, Right ()] s),
+                 mwrite (" "++(show s)++" ") (lwaitP P10 $ return $ mChangeState [Left P10, Right ()] s),
+                 mwrite (" "++(show s)++" ") (lwaitP P2  $ return $ mChangeState [Left P1, Left P2, Right ()] s),
+                 mwrite (" "++(show s)++" ") (lwaitP P5  $ return $ mChangeState [Left P1, Left P5, Right ()] s),
+                 mwrite (" "++(show s)++" ") (lwaitP P10 $ return $ mChangeState [Left P1, Left P10, Right ()] s),
+                 mwrite (" "++(show s)++" ") (lwaitP P5  $ return $ mChangeState [Left P2, Left P5, Right ()] s),
+                 mwrite (" "++(show s)++" ") (lwaitP P10 $ return $ mChangeState [Left P2, Left P10, Right ()] s),
+                 mwrite (" "++(show s)++" ") (lwaitP P10 $ return $ mChangeState [Left P5, Left P10, Right ()] s)]
 
-lallValidPlays :: ListDur State -> LogList (ListDur State)
-lallValidPlays (LD [Duration (x,s)]) =
-    manyLChoice[ mwrite (" "++(show s)++" ") (return $ waitP P1  $ return $ mChangeState [Left P1, Right ()] s),
-                 mwrite (" "++(show s)++" ") (return $ waitP P2  $ return $ mChangeState [Left P2, Right ()] s),
-                 mwrite (" "++(show s)++" ") (return $ waitP P5  $ return $ mChangeState [Left P5, Right ()] s),
-                 mwrite (" "++(show s)++" ") (return $ waitP P10 $ return $ mChangeState [Left P10, Right ()] s),
-                 mwrite (" "++(show s)++" ") (return $ waitP P2  $ return $ mChangeState [Left P1, Left P2, Right ()] s),
-                 mwrite (" "++(show s)++" ") (return $ waitP P5  $ return $ mChangeState [Left P1, Left P5, Right ()] s),
-                 mwrite (" "++(show s)++" ") (return $ waitP P10 $ return $ mChangeState [Left P1, Left P10, Right ()] s),
-                 mwrite (" "++(show s)++" ") (return $ waitP P5  $ return $ mChangeState [Left P2, Left P5, Right ()] s),
-                 mwrite (" "++(show s)++" ") (return $ waitP P10 $ return $ mChangeState [Left P2, Left P10, Right ()] s),
-                 mwrite (" "++(show s)++" ") (return $ waitP P10 $ return $ mChangeState [Left P5, Left P10, Right ()] s)]
-
--- lexec :: LogList (ListDur State)
--- lexec = do { s0 <- lallValidPlays lgInit ; s1 <- lallValidPlays s0 ; return s1 }
-
-
-lexec :: Int -> ListDur State -> LogList (ListDur State)
+lexec :: Int -> State -> LogListDur State
 lexec 0 s = return s
-lexec n s = do { s1 <- (lallValidPlays s) ; lexec (n - 1) s1 }
+lexec n s = do { s1 <- lvalidPlays s ; lexec (n-1) s1 }
 
+lleq17 = find (\(log , Duration (d , s)) -> d == 17 && s == gFinal) (remL (lexec 5 gInit))
 
-lleq17 = case find (\(log,LD [Duration (b,c)]) -> b==17 && c==gFinal) (remLog (lexec 6 lgInit)) of
-           Nothing -> (show "")
-           Just y  -> (show y)
-
-{----------------------------------- Monad LogList -----------------------------------}
-
--- data LogListDur a = L [(String, Duration a)] deriving Show
-
--- remL :: LogListDur a -> [(String, Duration a)]
--- remL (L x) = x
-
--- instance Functor LogListDur where
---   fmap f x = do
---       res <- x
---       return (f res)
-
--- instance Applicative LogListDur where
---   pure x = L [([], Duration (0,x))]
---   (L f) <*> x = fmap f x
-
-
---     --   L $ do
---     -- f' <- remL f
---     -- x' <- remL x
---     -- g (f',x')
---     -- where
---     --   g ((s, f), (s', x)) = return (s ++ s', f x)
-
--- instance Monad LogListDur where
---   return = pure
---   l >>= k = Log $ do x <- remLog l
---                      g x where
---                        g(s,x) = let u = (remLog (k x)) in map (\(s',x) -> (s ++ s', x)) u
+ll17 = find (\(log , Duration (d , s)) -> d < 17 && s == gFinal) (remL (lexec 5 gInit))

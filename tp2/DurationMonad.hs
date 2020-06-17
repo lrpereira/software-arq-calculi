@@ -4,6 +4,9 @@ module DurationMonad where
 
 data Duration a = Duration (Int, a) deriving Show
 
+remD :: Duration a -> (Int,a)
+remD (Duration (d,x)) = (d,x)
+                
 getDuration :: Duration a -> Int
 getDuration (Duration (d,x)) = d
 
