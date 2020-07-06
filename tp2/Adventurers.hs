@@ -1,10 +1,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Adventurers where
 
-import Control.Monad.Zip
-import Data.List.Extra
 import Extra
 import DurationMonad
+import Control.Monad.Zip
+import Data.List.Extra
+import Graphics.Gloss
 
 -- The list of adventurers
 data Adventurer = P1 | P2 | P5 | P10 deriving (Show,Eq)
